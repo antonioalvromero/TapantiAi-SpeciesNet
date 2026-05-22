@@ -1,0 +1,134 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speciesnet"
+version = "5.0.4"
+authors = [
+    {name = "Google Camera Traps AI team", email = "cameratraps@google.com"},
+]
+description = "Tools for classifying species in images from motion-triggered wildlife cameras."
+keywords = [
+    "camera traps",
+    "conservation",
+    "wildlife",
+    "ai",
+    "species classification",
+    "wildlife insights",
+    "speciesnet",
+]
+readme = "README.md"
+license = "Apache-2.0" 
+classifiers = [
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+requires-python = ">= 3.9, < 3.14"
+dependencies = [
+    "absl-py",
+    "cloudpathlib",
+    "huggingface_hub",
+    "humanfriendly",
+    "kagglehub",
+    "matplotlib",
+    "numpy < 2.0 ; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "numpy ; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "onnx2torch",
+    "pandas",
+    "pillow",
+    "requests",
+    "reverse_geocoder",
+    "tqdm",
+    "torch >= 2.0",
+    "yolov5 >= 7.0.8, < 7.0.12",
+    "setuptools<82"
+]
+
+[project.optional-dependencies]
+az = [
+    "cloudpathlib[azure]",
+]
+gs = [
+    "cloudpathlib[gs]",
+]
+s3 = [
+    "cloudpathlib[s3]",
+]
+notebooks = [
+    "ipykernel",
+]
+server = [
+    "fastapi",
+    "litserve",
+]
+all = [
+    "speciesnet[az]",
+    "speciesnet[gs]",
+    "speciesnet[s3]",
+    "speciesnet[notebooks]",
+    "speciesnet[server]",
+]
+dev = [
+    "speciesnet[all]",
+    "black[jupyter]",
+    "isort",
+    "pylint",
+    "pymarkdownlnt",
+    "pyright",
+    "pytest",
+]
+github = [
+    "speciesnet[dev]",
+    "pytest-custom_exit_code",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/google/cameratrapai"
+"Wildlife Insights" = "https://www.wildlifeinsights.org"
+
+[tool.black]
+extend-exclude = "^/third_party"
+
+[tool.isort]
+profile = "google"
+line_length = 88
+skip_gitignore = true
+extend_skip = ["third_party"]
+
+[tool.pymarkdown]
+# line-length
+plugins.md013.enabled = false
+# no-duplicate-heading
+plugins.md024.siblings_only = true
+
+[tool.pyright]
+exclude = [
+    "**/.*",
+    "**/__pycache__",
+    "**/node_modules",
+    "third_party",
+]
+ignore = [
+    "speciesnet/scripts/run_model_in_chunks.py",
+]
+useLibraryCodeForTypes = false
+
+[tool.pytest.ini_options]
+addopts = "--ignore=third_party"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.setuptools.packages.find]
+include = ["speciesnet*"]
