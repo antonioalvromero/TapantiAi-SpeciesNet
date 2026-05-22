@@ -1,3 +1,4 @@
+import uvicorn
 import json
 import shutil
 import tempfile
@@ -70,3 +71,11 @@ async def predict(
         results = json.load(f)
 
     return results
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "run_server:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False
+    )
