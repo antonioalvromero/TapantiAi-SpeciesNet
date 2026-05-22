@@ -14,6 +14,71 @@ from megadetector.detection.run_md_and_speciesnet import (
 app = FastAPI()
 
 
+# =========================================================
+# SIMPLIFY RESPONSE
+# =========================================================
+
+def simplify_results(results):
+
+    simplified = {
+        "images": []
+    }
+
+    # =====================================================
+    # CATEGORY MAP
+    # =====================================================
+
+    category_map = results.get("classification_categories", {})
+
+    for image in results.get("images", []):
+
+        image_result = {
+            "file": image.get("file"),
+            "detections": []
+        }
+
+        for det in image.get("detections", []):
+
+            detection = {
+                "bbox": det.get("bbox"),
+                "detection_confidence": det.get("conf")
+            }
+
+            # =================================================
+            # CLASSIFICATIONS
+            # =================================================
+
+            classifications = det.get("classifications", [])
+
+            if classifications:
+
+                top_class = max(
+                    classifications,
+                    key=lambda x: x[1]
+                )
+
+                species_id = str(top_class[0])
+
+                detection["species_id"] = species_id
+
+                detection["species"] = category_map.get(
+                    species_id,
+                    "unknown"
+                )
+
+                detection["species_confidence"] = top_class[1]
+
+            image_result["detections"].append(detection)
+
+        simplified["images"].append(image_result)
+
+    return simplified
+
+
+# =========================================================
+# API ENDPOINT
+# =========================================================
+
 @app.post("/predict")
 async def predict(
     files: list[UploadFile] = File(...)
@@ -58,21 +123,35 @@ async def predict(
     # RUN PIPELINE
     # ==========================================
 
-    run_md_and_speciesnet(options)
+    try:
 
-    # ==========================================
-    # LOAD RESULTS
-    # ==========================================
+        run_md_and_speciesnet(options)
 
-    if not output_file.exists():
-        raise HTTPException(500, "No output generated")
+        if not output_file.exists():
+            raise HTTPException(500, "No output generated")
 
-    with open(output_file, "r") as f:
-        results = json.load(f)
+        with open(output_file, "r") as f:
+            results = json.load(f)
 
-    return results
+        # ======================================
+        # SIMPLIFY JSON
+        # ======================================
+
+        simplified_results = simplify_results(results)
+
+        return simplified_results
+
+    finally:
+
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+# =========================================================
+# MAIN
+# =========================================================
 
 if __name__ == "__main__":
+
     uvicorn.run(
         "run_server:app",
         host="0.0.0.0",
