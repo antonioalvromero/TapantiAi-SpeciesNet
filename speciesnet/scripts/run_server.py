@@ -4,7 +4,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 from megadetector.detection.run_md_and_speciesnet import (
     run_md_and_speciesnet,
@@ -15,91 +16,40 @@ app = FastAPI()
 
 
 # =========================================================
-# SIMPLIFY RESPONSE
+# REQUEST MODEL
 # =========================================================
 
-def simplify_results(results):
+class Instance(BaseModel):
+    filepath: str
 
-    simplified = {
-        "images": []
-    }
-
-    # =====================================================
-    # CATEGORY MAP
-    # =====================================================
-
-    category_map = results.get("classification_categories", {})
-
-    for image in results.get("images", []):
-
-        image_result = {
-            "file": image.get("file"),
-            "detections": []
-        }
-
-        for det in image.get("detections", []):
-
-            detection = {
-                "bbox": det.get("bbox"),
-                "detection_confidence": det.get("conf")
-            }
-
-            # =================================================
-            # CLASSIFICATIONS
-            # =================================================
-
-            classifications = det.get("classifications", [])
-
-            if classifications:
-
-                top_class = max(
-                    classifications,
-                    key=lambda x: x[1]
-                )
-
-                species_id = str(top_class[0])
-
-                detection["species_id"] = species_id
-
-                detection["species"] = category_map.get(
-                    species_id,
-                    "unknown"
-                )
-
-                detection["species_confidence"] = top_class[1]
-
-            image_result["detections"].append(detection)
-
-        simplified["images"].append(image_result)
-
-    return simplified
-
+class PredictRequest(BaseModel):
+    instances: list[Instance]
 
 # =========================================================
 # API ENDPOINT
 # =========================================================
 
 @app.post("/predict")
-async def predict(
-    files: list[UploadFile] = File(...)
-):
+async def predict(request: PredictRequest):
 
     # ==========================================
-    # CREATE TEMP FOLDER
+    # VALIDATE PATHS
+    # ==========================================
+
+    for instance in request.instances:
+        if not Path(instance.filepath).exists():
+            raise HTTPException(400, f"File not found: {instance.filepath}")
+
+    # ==========================================
+    # COPY FILES TO TEMP DIR
     # ==========================================
 
     temp_dir = tempfile.mkdtemp()
 
-    # ==========================================
-    # SAVE IMAGES
-    # ==========================================
-
-    for file in files:
-
-        file_path = Path(temp_dir) / file.filename
-
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    for instance in request.instances:
+        src = Path(instance.filepath)
+        dst = Path(temp_dir) / src.name
+        shutil.copy2(src, dst)
 
     # ==========================================
     # OUTPUT FILE
@@ -112,10 +62,8 @@ async def predict(
     # ==========================================
 
     options = RunMDSpeciesNetOptions()
-
-    options.source = temp_dir
+    options.source = str(temp_dir)
     options.output_file = str(output_file)
-
     options.keep_intermediate_files = False
     options.verbose = True
 
@@ -124,7 +72,6 @@ async def predict(
     # ==========================================
 
     try:
-
         run_md_and_speciesnet(options)
 
         if not output_file.exists():
@@ -133,16 +80,9 @@ async def predict(
         with open(output_file, "r") as f:
             results = json.load(f)
 
-        # ======================================
-        # SIMPLIFY JSON
-        # ======================================
-
-        simplified_results = simplify_results(results)
-
-        return simplified_results
+        return results
 
     finally:
-
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -151,7 +91,6 @@ async def predict(
 # =========================================================
 
 if __name__ == "__main__":
-
     uvicorn.run(
         "run_server:app",
         host="0.0.0.0",
